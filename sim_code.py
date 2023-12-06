@@ -54,10 +54,8 @@ from random import randint
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
 
-usensors=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-noDetectionDist=.75
-maxDetectionDist=0.3
-detect=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+#usensors=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+#detect=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 braitenbergL=[-0.2,-0.4,-0.6,-0.8,-1,-1.2,-1.4,-1.6, 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
 braitenbergR=[-1.6,-1.4,-1.2,-1,-0.8,-0.6,-0.4,-0.2, 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
 v0=2
@@ -77,6 +75,7 @@ class amigoEnv(gym.Env):
     def __init__ (self):
         super(amigoEnv, self).__init__()
         # gaurenteed this will need to be fixed
+        # ultrasonic will need to be edited to work with coppeliaSim stuff.
         self.ultrasonic = Box(low = noDetectionDist, high = maxDetectionDist, shape=(len(usensors),), dtype = np.float32) # this is how the env observations is produced
         self.orientation = 90
         self.position = MultiDiscrete([10,10])
@@ -106,6 +105,7 @@ class amigoEnv(gym.Env):
         self.old_location = [0,0]
         self.actions_taken = 0
         self.reward = 0
+        # check to see when reset is triggered. Likely after each step/run
         # self.destination = np.array([randint(1,10), randint(1,10)])
         print(f"destination{self.destination}")
         print("resetting")
@@ -121,19 +121,20 @@ class amigoEnv(gym.Env):
         else:
             done = False
 
-
         self.actions_taken += 1
         reward = self.reward
         self.old_location[0] = self.position[0]
         self.old_location[1] = self.position[0]
 
-        # sim.setJointTargetVelocity(sim.getObject("./leftMotor"),vLeft)
-        # sim.setJointTargetVelocity(sim.getObject("./rightMotor"),vRight)
-        
         # we will need a function to help the robot turn if it is not facing the direction it wants to move
+        # move forward will be positive, backwards is negative motion
+        # move right is positive, move left is negative. 
+        # robot front will either face forward or right.
+        # moving backwards or left will always be reverse motion
         if action == 0: # move forward
             if self.orientation != 90:
                 # put code to turn robot
+                self.move()
                 orientation = 90
             # move forward
             self.position[1] = self.old_location[1]+1
@@ -141,22 +142,28 @@ class amigoEnv(gym.Env):
         elif action == 1: # move backwards
             if self.orientation != 90:
                 # put code to turn robot
+                self.move()
                 orientation = 90
             # move backwards
+            self.move()
             self.position[1] = self.old_location[1]-1
 
         elif action == 2: # move left
             if self.orientation != 0:
                 # put code to turn robot
+                self.move()
                 orientation = 0
             # move backwards (left)
+            self.move()
             self.position[0] = self.old_location[0]-1
 
         elif action == 3: # move right
             if self.orientation != 0:
                 # put code to turn robot
+                self.move()
                 orientation = 0
             # move foward (right)
+            self.move()
             self.position[0] = self.old_location[0]+1
 
         else: 
@@ -202,14 +209,41 @@ class amigoEnv(gym.Env):
     def add_obstacle(self):
         print("we'll randomly add cubes later if time")
 
-    def getProximity(self):
+    def initProximity(self):
         # likely won't need anything other than res to see if something was detected and dist if something was
-        res, dist, point, _, _ = self.sim.handleProximitySensor(ultrasonicSensor[0])
-        # I think maybe we don't need this either
-        # res, dist, point, _, _ = sim.readProximitySensor
-        return res, dist, point
+        
+        self.usensors=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        self.detect=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
+        for i in range (0,16):
+            print(i)
+            usensors[i]=self.sim.getObject("./ultrasonicSensor",[i])
+            self.sim.setObjectInt32Param(usensors[i],_,_) # fix this error.
 
+    def getProximity(self):
+        noDetectionDist=.75
+        minDetectionDist=0.3
+        for i in range (0,16):
+            res=self.sim.handleProximitySensor(usensors[i])[0]
+            dist=self.sim.handleProximitySensor(usensors[i])[1]
+            # if there is a detection (res is not 0) and we are close enough to object (dist < noDetectionDist)
+            if (res>0) and (dist<noDetectionDist):
+                if (dist<minDetectionDist):
+                    dist=minDetectionDist
+                    # I am not sure that we need these calculations. May just add dist?
+                self.detect[i]=1-((dist-minDetectionDist)/(noDetectionDist-minDetectionDist))
+            else:
+                self.detect[i]=0
+
+        return self.detect
+
+    def move(self, action, orientation):
+        print("placeholder")
+        # we'll need to specify vLeft and vRight
+        # will also need to specify time we do this
+        self.sim.setJointTargetVelocity(self.sim.getObject("./leftMotor"),vLeft)
+        self.sim.setJointTargetVelocity(self.sim.getObject("./rightMotor"),vRight)
+        
 # we will likely not need what is below!
 
 def sysCall_init():
