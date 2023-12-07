@@ -134,9 +134,10 @@ class amigoEnv(gym.Env):
         if action == 0: # move forward
             if self.orientation != 90:
                 # put code to turn robot
-                self.move()
+                self.move(self.move(60, -60, 3))
                 orientation = 90
             # move forward
+            self.move(60, 60, 6)
             self.position[1] = self.old_location[1]+1
 
         elif action == 1: # move backwards
@@ -145,25 +146,25 @@ class amigoEnv(gym.Env):
                 self.move()
                 orientation = 90
             # move backwards
-            self.move()
+            self.move(-60, -60, 6)
             self.position[1] = self.old_location[1]-1
 
         elif action == 2: # move left
             if self.orientation != 0:
                 # put code to turn robot
-                self.move()
+                self.move(self.move(60, -60, 3))
                 orientation = 0
             # move backwards (left)
-            self.move()
+            self.move(-60, -60, 6)
             self.position[0] = self.old_location[0]-1
 
         elif action == 3: # move right
             if self.orientation != 0:
                 # put code to turn robot
-                self.move()
+                self.move(self.move(-60, 60, 3))
                 orientation = 0
             # move foward (right)
-            self.move()
+            self.move(60, 60, 6)
             self.position[0] = self.old_location[0]+1
 
         else: 
@@ -236,18 +237,29 @@ class amigoEnv(gym.Env):
                 self.detect[i]=0
 
         return self.detect
-
-    def move(self, action, orientation):
+# speed of 1 for 10 seconds for 1 block forward
+# speed of 1 for 2.9 seconds for 90 degree turn. 
+# turns left if left wheel is negative speed
+    def move(self, vLeft, vRight, time):
         print("placeholder")
         # we'll need to specify vLeft and vRight
         # will also need to specify time we do this
-        self.sim.setJointTargetVelocity(self.sim.getObject("./leftMotor"),vLeft)
-        self.sim.setJointTargetVelocity(self.sim.getObject("./rightMotor"),vRight)
+        leftMotor = self.sim.getObject("./leftMotor")
+        rightMotor = self.sim.getObject("./rightMotor")
+        # no we use wait in this house
+        # self.sim.backUntilTime = self.simg.getSimulationTime() + time
+
+        while self.sim.backUntilTime < self.simg.getSimulationTime():
+            self.sim.setJointTargetVelocity(leftMotor,vLeft)
+            self.sim.setJointTargetVelocity(rightMotor,vRight)
+
+        self.sim.setJointTargetVelocity(self.sim.getObject("./leftMotor"),0)
+        self.sim.setJointTargetVelocity(self.sim.getObject("./rightMotor"),0)
         
 # we will likely not need what is below!
 
-def sysCall_init():
-    sim = require('sim')
+def sysCall_init(self):
+    sim = self.require('sim')
     robot=sim.getObject('.')
     obstacles=sim.createCollection(0)
     sim.addItemToCollection(obstacles,sim.handle_all,-1,0)
@@ -260,7 +272,6 @@ def sysCall_init():
 
 #def sysCall_cleanup(): 
  
-
 def sysCall_actuation(): 
     global noDetectionDist
     global maxDetectionDist
