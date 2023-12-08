@@ -31,12 +31,17 @@ import time
 from sim_code import amigoEnv #verify
 
 env = amigoEnv()
-log_path = "~/tjs1980/RL_Final_EE585"
-model =  PPO('MlpPolicy', env, verbose = 1, tensorboard_log = log_path)
+# Wrap the environment with DummyVecEnv for compatibility
+env = DummyVecEnv([lambda: env])
 
-model.learn(total_timesteps = 5000)
+
+log_path = "~/tjs1980/RL_Final_EE585/tensorboard/test1"
+print("init model")
+# model =  PPO('MlpPolicy', env, verbose = 1, tensorboard_log = log_path)
+model =  PPO('MultiInputPolicy', env, verbose = 1, n_steps= 500, policy_kwargs=dict{'net_arc':[256, 256, 256]})
+model.learn(total_timesteps = 10)
 # Tianna, make a new dir to save your models in!!!
-save_path = "~/tjs1980/RL_Final_EE585/saved_models"
+save_path = "~/tjs1980/RL_Final_EE585/saved_models/test1"
 model.save(save_path)
 evaluate_policy(model, env, n_eval_episodes = 10, render = True)
 env.close()

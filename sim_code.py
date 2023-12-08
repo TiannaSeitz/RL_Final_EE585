@@ -47,12 +47,12 @@ import math
 import random
 import os
 
-from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv
+#import stable_baselines3 
+#from stable_baselines3.common.vec_env 
 from random import randint
 
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
-import time
+from time import sleep
 
 
 #usensors=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
@@ -75,8 +75,10 @@ Actions:
 class amigoEnv(gym.Env):
     def __init__ (self):
         super(amigoEnv, self).__init__()
+
         # gaurenteed this will need to be fixed
         # ultrasonic will need to be edited to work with coppeliaSim stuff.
+        print("initalizing")
         self.noDetectionDist = 0.75
         self.minDetectionDist = 0.3
         self.action_space = Discrete(4) 
@@ -87,30 +89,54 @@ class amigoEnv(gym.Env):
         self.orientation = 90
         self.old_location = [0,0]
         self.actions_taken = 0
+        print("loading scene")
+        self.sim = None
+        self.client = None
+        # self.load_scene() #this is where it gets stuck!!!
+        client = RemoteAPIClient('localhost', 23000)
+        self.sim = client.getObject('sim')
+        self.sim.stopSimulation()
+        sleep(1)
+        self.sim.closeScene()
+        sleep(1)
+        # do we need stepping?? maybe?
+        self.sim.loadScene('/home/ros-admin/tjs1980/seitz_csim/scenes/tjs1980_final_env.ttt')
+        # we might need to add shapes?
+        self.sim.startSimulation()  
 
+
+        print("scene loaded. Running Proximity")
+        self.initProximity()
 
         # okay so we don't declare what the starting actions are here, we just set up the spaces for the stuff to be put into.
         self.observation_space = Dict({
             'location': MultiDiscrete([10,10]),
             'old_location': MultiDiscrete([10,10]),
-            'proximity_sensor': Box(low = self.minDetectionDist, high = self.noDetectionDist, shape=(len(usensors),), dtype = np.float32), # this is how the env observations is produced
-            'actions_taken': Discrete(10),
-            'destination': np.array([randint(1,10), randint(1,10)]),
-            'orientation': Discrete(2)
+            'proximity_sensor': Box(low = self.minDetectionDist, high = self.noDetectionDist, shape=(len(self.usensors),), dtype = np.float32), # this is how the env observations is produced
+            'actions_taken': Discrete(50), # keeping it at 50 just in case
+            'destination': MultiDiscrete([1, 6]),
+            'orientation': Discrete(91)
         })
 
-        print(f"destination{self.destination}")
         # self.gamma = .01 # this is to try and get it to optimize route later
-        print("setting up")
-        self.sim = None
-        self.client = None
-        self.load()
+        #self.sim = None
+        #self.client = None
+        #self.load()
+        print("done setup")
 
+    # def load_scene(self):
+    #     self.api = RemoteAPIClient('localhost', 23000)
+    #     self.sim = self.api.getObject('sim')
+    #     # do we need stepping?? maybe?
+    #     self.sim.loadScene('~/tjs1980/seitz_csim/scenes/tjs1980_final_env.ttt')
+    #     # we might need to add shapes?
+    #     self.sim.startSimulation()  
+        
     def reset(self): # may need to be revised...
 
         self.sim.stopSimulation()
-        time.sleep(0.1)
-        self.sim.load()
+        sleep(1)
+        # self.sim.load()
         self.position = [0,0] # especially fix this
         self.orientation = 90
         self.old_location = [0,0]
@@ -144,7 +170,6 @@ class amigoEnv(gym.Env):
         # moving backwards or left will always be reverse motion
 
         # left right time
-        self.initProximity()
 
         if action == 0: # move forward
             if self.orientation != 90:
@@ -188,7 +213,7 @@ class amigoEnv(gym.Env):
         self.client.step()
         ultrasonic_result = self.getProximity()
 
-        if np.array_equal(self.position, self.destination): # end goal is to end up at this x,y location
+        if np.array_equal(self.position, self.observation_space["destination"]): # end goal is to end up at this x,y location
             reward += 50
             print("reached location")
             done = True
@@ -203,33 +228,32 @@ class amigoEnv(gym.Env):
 
         # did we advance towards the x coordinate of location?
         # it's okay for robot to move away from final dest to avoid object, so consequence will be lower
-        if (self.destination[0]-self.position[0]) < (self.destination[0]-self.old_location[0]):
+        if (self.observation_space["destination"][0]-self.position[0]) < (self.observation_space["destination"][0]-self.old_location[0]):
             reward += 1
         else:
             reward -= 1
 
         # did we advance towards the y coordinate of location?
-        if (self.destination[1]-self.position[1]) < (self.destination[1]-self.old_location[1]):
+        if (self.observation_space["destination"][1]-self.position[1]) < (self.observation_space["destination"][1]-self.old_location[1]):
             reward +=1
         else:
             reward -=1
+
+        if(self.position[1]>=4) or self.position[1]<=-5:
+            reward -= 50
+            done = True
+        if(self.position[0]>=7) or self.position[1]<=-2:
+            reward -= 50
+            done = True
         
         # does this have to be a specific order?
         self.observation_space["actions_taken"] = self.actions_taken
         self.observation_space["location"] = self.position
         self.observation_space["old_location"] = self.old_location
         self.observation_space["orientation"] = self.orientation
-        self.observation_space["proximity_sensor"] = self.ultrasonic_result
+        self.observation_space["proximity_sensor"] = ultrasonic_result
 
-        return self.observation_space, reward, done
-
-    def load_scene(self):
-        self.api = RemoteAPIClient('localhost', 23000)
-        self.sim = self.api.getObject('sim')
-        # do we need stepping?? maybe?
-        self.sim.loadScene('~/tjs1980/seitz_csim/scenes/tjs1980_final_env.ttt')
-        # we might need to add shapes?
-        self.sim.startSimulation()     
+        return self.observation_space, reward, done   
 
     def add_obstacle(self):
         print("we'll randomly add cubes later if time")
@@ -283,6 +307,7 @@ class amigoEnv(gym.Env):
 
     def close(self):
         self.sim.stopSimulation()
+        self.sim.closeSene()
         
 # we will likely not need what is below!
 
