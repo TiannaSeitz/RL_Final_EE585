@@ -103,7 +103,7 @@ class amigoEnv(gym.Env):
         self.sim.loadScene('/home/ros-admin/tjs1980/seitz_csim/scenes/tjs1980_final_env.ttt')
         # we might need to add shapes?
         self.sim.startSimulation()  
-
+        self.destination=[1,6]
 
         print("scene loaded. Running Proximity")
         self.initProximity()
@@ -114,7 +114,7 @@ class amigoEnv(gym.Env):
             'old_location': MultiDiscrete([10,10]),
             'proximity_sensor': Box(low = self.minDetectionDist, high = self.noDetectionDist, shape=(len(self.usensors),), dtype = np.float32), # this is how the env observations is produced
             'actions_taken': Discrete(50), # keeping it at 50 just in case
-            'destination': MultiDiscrete([1, 6]),
+            # 'destination': MultiDiscrete([1, 6]),
             'orientation': Discrete(91)
         })
 
@@ -213,7 +213,7 @@ class amigoEnv(gym.Env):
         self.client.step()
         ultrasonic_result = self.getProximity()
 
-        if np.array_equal(self.position, self.observation_space["destination"]): # end goal is to end up at this x,y location
+        if np.array_equal(self.position, self.destination): # end goal is to end up at this x,y location
             reward += 50
             print("reached location")
             done = True
@@ -228,13 +228,13 @@ class amigoEnv(gym.Env):
 
         # did we advance towards the x coordinate of location?
         # it's okay for robot to move away from final dest to avoid object, so consequence will be lower
-        if (self.observation_space["destination"][0]-self.position[0]) < (self.observation_space["destination"][0]-self.old_location[0]):
+        if (self.destination[0]-self.position[0]) < (self.destination[0]-self.old_location[0]):
             reward += 1
         else:
             reward -= 1
 
         # did we advance towards the y coordinate of location?
-        if (self.observation_space["destination"][1]-self.position[1]) < (self.observation_space["destination"][1]-self.old_location[1]):
+        if (self.destination[1]-self.position[1]) < (self.destination[1]-self.old_location[1]):
             reward +=1
         else:
             reward -=1
