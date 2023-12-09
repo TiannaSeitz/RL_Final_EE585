@@ -32,7 +32,9 @@ class amigoEnv(gym.Env):
         super(amigoEnv, self).__init__()
         self.observation_space = Box(low = -10, high = 10, shape=(2,), dtype = np.float32) # this is how the env observations is produced
         self.action_space = Discrete(4) 
-        self.position = np.array([0,0])
+        self.position_x = 0
+        self.position_y = 0
+        
         self.actions_taken = 0
         self.actions_max = 20
         self.reward = 0
@@ -92,7 +94,7 @@ class amigoEnv(gym.Env):
 
         info = {}
         
-        return self.position, reward, done, {}
+        return self.position_x, self.position_y, reward, done, {}
 
 
 env = DummyVecEnv([lambda: amigoEnv()])

@@ -50,16 +50,15 @@ import os
 #import stable_baselines3 
 #from stable_baselines3.common.vec_env 
 from random import randint
-
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 from time import sleep
 
 
 #usensors=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 #detect=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-braitenbergL=[-0.2,-0.4,-0.6,-0.8,-1,-1.2,-1.4,-1.6, 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
-braitenbergR=[-1.6,-1.4,-1.2,-1,-0.8,-0.6,-0.4,-0.2, 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
-v0=2
+#braitenbergL=[-0.2,-0.4,-0.6,-0.8,-1,-1.2,-1.4,-1.6, 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+#braitenbergR=[-1.6,-1.4,-1.2,-1,-0.8,-0.6,-0.4,-0.2, 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+#v0=2
 
 '''
 We keep track of the direction of the robot so that we know to turn if we are not facing the direction of motion
@@ -75,93 +74,96 @@ Actions:
 class amigoEnv(gym.Env):
     def __init__ (self):
         super(amigoEnv, self).__init__()
-
-        # gaurenteed this will need to be fixed
-        # ultrasonic will need to be edited to work with coppeliaSim stuff.
         print("initalizing")
         self.noDetectionDist = 0.75
         self.minDetectionDist = 0.3
+
+        self.destination_x = 1
+        self.destination_y = 6
+        
         self.action_space = Discrete(4) 
         self.actions_max = 20
-        self.reward = 0
 
-        self.position = [0,0]
-        self.orientation = 90
-        self.old_location = [0,0]
-        self.actions_taken = 0
+        self.reward = 0
+        self.done = False
+        self.observations = np.zeros((22,1))
+        # change to np.array I guess.
+        self.position_x = 0
+        self.position_y = 0
+        self.orientation =  0
+        self.old_location_x = 0
+        self.old_location_y = 0
+        self.actions_taken =  0
         print("loading scene")
-        self.sim = None
-        self.client = None
-        # self.load_scene() #this is where it gets stuck!!!
+
         client = RemoteAPIClient('localhost', 23000)
         self.sim = client.getObject('sim')
+        client.setStepping(True)
         self.sim.stopSimulation()
         sleep(1)
         self.sim.closeScene()
         sleep(1)
         # do we need stepping?? maybe?
-        self.sim.loadScene('/home/ros-admin/tjs1980/seitz_csim/scenes/tjs1980_final_env.ttt')
+        self.sim.loadScene('/home/mabl/tianna_ws/RL_Final_EE585/tjs1980_final_env.ttt')
         # we might need to add shapes?
         self.sim.startSimulation()  
-        self.destination=[1,6]
 
         print("scene loaded. Running Proximity")
         self.initProximity()
 
         # okay so we don't declare what the starting actions are here, we just set up the spaces for the stuff to be put into.
-        self.observation_space = Dict({
-            'location': MultiDiscrete([10,10]),
-            'old_location': MultiDiscrete([10,10]),
-            'proximity_sensor': Box(low = self.minDetectionDist, high = self.noDetectionDist, shape=(len(self.usensors),), dtype = np.float32), # this is how the env observations is produced
-            'actions_taken': Discrete(50), # keeping it at 50 just in case
-            # 'destination': MultiDiscrete([1, 6]),
-            'orientation': Discrete(91)
-        })
-
-        # self.gamma = .01 # this is to try and get it to optimize route later
-        #self.sim = None
-        #self.client = None
-        #self.load()
-        print("done setup")
-
-    # def load_scene(self):
-    #     self.api = RemoteAPIClient('localhost', 23000)
-    #     self.sim = self.api.getObject('sim')
-    #     # do we need stepping?? maybe?
-    #     self.sim.loadScene('~/tjs1980/seitz_csim/scenes/tjs1980_final_env.ttt')
-    #     # we might need to add shapes?
-    #     self.sim.startSimulation()  
         
-    def reset(self): # may need to be revised...
+        self.observation_space = Box(low = -255, high = 255, shape = (22,1), dtype = np.float32) # may need to specify type!
 
+    def reset(self): # may need to be revised...
+        print(f"reward = {self.reward}")
         self.sim.stopSimulation()
         sleep(1)
-        # self.sim.load()
-        self.position = [0,0] # especially fix this
-        self.orientation = 90
-        self.old_location = [0,0]
-        self.actions_taken = 0
+        client = RemoteAPIClient('localhost', 23000)
+        self.sim = client.getObject('sim')
+        client.setStepping(True)
+        sleep(1)
+        self.sim.closeScene()
+        sleep(1)
+        # do we need stepping?? maybe?
+        self.sim.loadScene('/home/mabl/tianna_ws/RL_Final_EE585/tjs1980_final_env.ttt')
+        self.sim.startSimulation()  
+
+        self.initProximity()
+ 
+        self.position_x = 0
+        self.position_y = 0
+        self.orientation =  0
+        self.old_location_x = 0
+        self.old_location_y = 0
+        self.actions_taken =  0
         self.reward = 0
-        self.observation_space = {} # this might break us?
-        # check to see when reset is triggered.
-        # self.destination = np.array([randint(1,10), randint(1,10)])
-        # print(f"destination{self.destination}")
+        
+        self.observation_hold = [self.position_x, self.position_y, self.orientation, self.old_location_x, self.old_location_y, self.actions_taken] + list(self.detect)
+        # self.observations = np.zeros((22,1))
+
+        for i in range(0,22):
+            self.observations[i] = self.observation_hold[i]
         print("resetting")
-        return self.observation_space
+        return self.observations, {}
     
     def step(self, action):
+        self.done = False
+        done = self.done
+
         offset = 0.05
         if self.actions_taken == self.actions_max: # if we run out of actions, thats really bad
-            reward -= 50
+            self.reward -= 50
             print("ran out of time")
             done = True
         else:
             done = False
 
         self.actions_taken += 1
-        reward = self.reward
-        self.old_location[0] = self.position[0]
-        self.old_location[1] = self.position[0]
+
+        
+        self.old_location_x = self.position_x
+        self.old_location_y = self.position_y
 
         # we will need a function to help the robot turn if it is not facing the direction it wants to move
         # move forward will be positive, backwards is negative motion
@@ -174,47 +176,47 @@ class amigoEnv(gym.Env):
         if action == 0: # move forward
             if self.orientation != 90:
                 # put code to turn robot
-                self.move(self.move(-1, 1, 2.9))
+                self.move(-1, 1, 2.9)
                 orientation = 90
             # move forward
             self.move(1, 1, 10)
-            self.position[1] = self.old_location[1]+1
+            self.position_y += 1
 
         elif action == 1: # move backwards
             if self.orientation != 90:
                 # put code to turn robot
-                self.move(self.move(-1, 1, 2.9))
+                self.move(-1, 1, 2.9)
                 orientation = 90
             # move backwards
             self.move(-1, -1, 10)
-            self.position[1] = self.old_location[1]-1
+            self.position_y -= 1
 
         elif action == 2: # move left
             if self.orientation != 0:
                 # put code to turn robot
-                self.move(self.move(1, -1, 2.9))
+                self.move(1, -1, 2.9)
                 orientation = 0
             # move backwards (left)
-            self.move(self.move(-1, -1, 10))
-            self.position[0] = self.old_location[0]-1
+            self.move(-1, -1, 10)
+            self.position_x -= 1
 
         elif action == 3: # move right
             if self.orientation != 0:
                 # put code to turn robot
-                self.move(self.move(1, -1, 2.9))
+                self.move(1, -1, 2.9)
                 orientation = 0
             # move foward (right)
-            self.move(self.move(1, 1, 10))
-            self.position[0] = self.old_location[0]+1
+            self.move(1, 1, 10)
+            self.position_x += 1
 
         else: 
             print("not an action!!")
 
-        self.client.step()
+        # self.client.step() # I have no clue why this is here.
         ultrasonic_result = self.getProximity()
 
-        if np.array_equal(self.position, self.destination): # end goal is to end up at this x,y location
-            reward += 50
+        if self.position_x == self.destination_x and self.position_y == self.destination_y: # end goal is to end up at this x,y location
+            self.reward += 50
             print("reached location")
             done = True
 
@@ -222,38 +224,37 @@ class amigoEnv(gym.Env):
         for i in range(0,len(ultrasonic_result)):
             if ultrasonic_result[i] < self.minDetectionDist-offset:
                 # avoiding objects is the most important task consequence of reward must be high
-                reward -= 10
+                self.reward -= 500
             else:
-                reward += 2
+                self.reward += 10
 
         # did we advance towards the x coordinate of location?
         # it's okay for robot to move away from final dest to avoid object, so consequence will be lower
-        if (self.destination[0]-self.position[0]) < (self.destination[0]-self.old_location[0]):
-            reward += 1
+        if (self.destination_x-self.position_x) < (self.destination_x-self.old_location_x):
+            self.reward += 1
         else:
-            reward -= 1
+            self.reward -= 1
 
         # did we advance towards the y coordinate of location?
-        if (self.destination[1]-self.position[1]) < (self.destination[1]-self.old_location[1]):
-            reward +=1
+        if (self.destination_y-self.position_y) < (self.destination_y-self.old_location_y):
+            self.reward +=1
         else:
-            reward -=1
+            self.reward -=1
 
-        if(self.position[1]>=4) or self.position[1]<=-5:
-            reward -= 50
+        if(self.position_x>=4) or self.position_x<=-5:
+            self.reward -= 500
             done = True
-        if(self.position[0]>=7) or self.position[1]<=-2:
-            reward -= 50
+        if(self.position_y>=7) or self.position_y<=-2:
+            self.reward -= 500
             done = True
-        
-        # does this have to be a specific order?
-        self.observation_space["actions_taken"] = self.actions_taken
-        self.observation_space["location"] = self.position
-        self.observation_space["old_location"] = self.old_location
-        self.observation_space["orientation"] = self.orientation
-        self.observation_space["proximity_sensor"] = ultrasonic_result
 
-        return self.observation_space, reward, done   
+        self.observation_hold = [self.position_x, self.position_y, self.orientation, self.old_location_x, self.old_location_y, self.actions_taken] + list(self.detect)
+        # self.observations = np.zeros((22,1))
+
+        for i in range(0,22):
+            self.observations[i] = self.observation_hold[i]
+
+        return (self.observations, self.reward, done, {}, {})
 
     def add_obstacle(self):
         print("we'll randomly add cubes later if time")
@@ -265,14 +266,13 @@ class amigoEnv(gym.Env):
         self.detect=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
         for i in range (0,16):
-            print(i)
             self.usensors[i]=self.sim.getObject("./ultrasonicSensor",[i])
             # self.sim.setObjectInt32Param(usensors[i],_,_) # fix this error.
 
     def getProximity(self):
         for i in range (0,len(self.usensors)):
-            res=self.sim.handleProximitySensor(self.usensors[i])[0]
-            dist=self.sim.handleProximitySensor(self.usensors[i])[1]
+            res=self.sim.readProximitySensor(self.usensors[i])[0]
+            dist=self.sim.readProximitySensor(self.usensors[i])[1]
             # if there is a detection (res is not 0) and we are close enough to object (dist < noDetectionDist)
             if (res>0) and (dist<self.noDetectionDist):
                 if (dist<self.minDetectionDist):
@@ -288,8 +288,7 @@ class amigoEnv(gym.Env):
 # speed of 1 for 2.9 seconds for 90 degree turn. 
 # turns left if left wheel is negative speed
 
-    def move(self, vLeft, vRight, time):
-        print("placeholder")
+    def move(self, vLeft, vRight, move_time):
         # we'll need to specify vLeft and vRight
         # will also need to specify time we do this
         leftMotor = self.sim.getObject("./leftMotor")
@@ -297,61 +296,20 @@ class amigoEnv(gym.Env):
         # no we use wait in this house
         # self.sim.backUntilTime = self.simg.getSimulationTime() + time
 
-        while self.sim.backUntilTime < self.simg.getSimulationTime():
-            self.sim.setJointTargetVelocity(leftMotor,vLeft)
-            self.sim.setJointTargetVelocity(rightMotor,vRight)
+       
+        self.sim.setJointTargetVelocity(leftMotor,vLeft)
+        self.sim.setJointTargetVelocity(rightMotor,vRight)
 
-        self.sim.setJointTargetVelocity(self.sim.getObject("./leftMotor"),0)
-        self.sim.setJointTargetVelocity(self.sim.getObject("./rightMotor"),0)
+        sleep(move_time)
+
+        self.sim.setJointTargetVelocity(leftMotor,0)
+        self.sim.setJointTargetVelocity(rightMotor,0)
+        sleep(1)
 
 
     def close(self):
         self.sim.stopSimulation()
         self.sim.closeSene()
-        
-# we will likely not need what is below!
 
-# def sysCall_init(self):
-#     sim = self.require('sim')
-#     robot=sim.getObject('.')
-#     obstacles=sim.createCollection(0)
-#     sim.addItemToCollection(obstacles,sim.handle_all,-1,0)
-#     sim.addItemToCollection(obstacles,sim.handle_tree,robot,1)
-#     global usensors
-#     for i in range (0,16):
-#         print(i)
-#         usensors[i]=sim.getObject("./ultrasonicSensor",[i])
-#         sim.setObjectInt32Param(usensors[i],sim.proxintparam_entity_to_detect,obstacles)
-
-# #def sysCall_cleanup(): 
- 
-# def sysCall_actuation(): 
-#     global noDetectionDist
-#     global maxDetectionDist
-#     global detect
-#     global braitenbergL
-#     global braitenbergR
-#     global v0
-    
-#     for i in range (0,16):
-#         res=sim.readProximitySensor(usensors[i])[0]
-#         dist=sim.readProximitySensor(usensors[i])[1]
-#         if (res>0) and (dist<noDetectionDist):
-#             if (dist<maxDetectionDist):
-#                 dist=maxDetectionDist
-#             detect[i]=1-((dist-maxDetectionDist)/(noDetectionDist-maxDetectionDist))
-#         else:
-#             detect[i]=0
-        
-#     vLeft=v0
-#     vRight=v0
-    
-#     for i in range (0,16):
-#         vLeft=vLeft+braitenbergL[i]*detect[i]/2
-#         vRight=vRight+braitenbergR[i]*detect[i]
-    
-#     sim.setJointTargetVelocity(sim.getObject("./leftMotor"),vLeft)
-#     sim.setJointTargetVelocity(sim.getObject("./rightMotor"),vRight)
-
-
-# # alright. Question of the century. putting it all together... How though?
+    def render(self):
+            print("placeholder I guess")
