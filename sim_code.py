@@ -65,10 +65,10 @@ class amigoEnv(gym.Env):
         self.noDetectionDist = 0.75
         self.minDetectionDist = 0.3
         # we will have to go into campus to see where they actually are.
-        self.destination_x = 1
-        self.destination_y = 1
-        self.destination_x_max = 1.5
-        self.destination_y_max = 1.5
+        self.destination_x = 1.8
+        self.destination_y =  -0.35
+        self.destination_x_max = 2.6
+        self.destination_y_max = 0.6
         
         self.action_space = Discrete(4) 
         self.actions_max = 20
@@ -183,7 +183,6 @@ class amigoEnv(gym.Env):
             self.pos_of_sensor = self.sim.getObjectPosition(self.usensors[3])
             self.position_y = self.pos_of_sensor[1]
             self.position_x = self.pos_of_sensor[0]
-            self.reward -= 5
 
         elif action == 2: # move left
             if self.orientation != 0:
@@ -227,10 +226,10 @@ class amigoEnv(gym.Env):
             done = True
         else:
             if pos_done_x == True and pos_done_y == False:
-                self.reward -= 25
+                self.reward -= 10
 
             elif pos_done_x == False and pos_done_y == True:
-                self.reward -= 25
+                self.reward -= 10
 
         # are we too close to an object?
         if ultrasonic_result[3] < self.minDetectionDist-offset:
@@ -249,24 +248,23 @@ class amigoEnv(gym.Env):
 
         # did we advance towards the x coordinate of location?
         # it's okay for robot to move away from final dest to avoid object, so consequence will be lower
-        if (self.destination_x-self.position_x) < (self.destination_x-self.old_location_x):
-            self.reward += 5
+        if abs(self.destination_x_max)-abs(self.position_x) < abs(self.destination_x_max)-abs(self.old_location_x):
+            self.reward += 10
         else:
-            self.reward -= 5 # Maybe this is a reward that we can get rid of.
+            self.reward -= 10 # Maybe this is a reward that we can get rid of.
 
         # did we advance towards the y coordinate of location?
-        if (self.destination_y-self.position_y) < (self.destination_y-self.old_location_y):
-            self.reward +=5
+        if abs(self.destination_y_max)-abs(self.position_y) < abs(self.destination_y_max)-abs(self.old_location_y):
+            self.reward +=10
         else:
-            self.reward -=5 # Maybe this is a reward that we can get rid of.
+            self.reward -=10 # Maybe this is a reward that we can get rid of.
 
-        # idk how to make sure that it doesnt fall off the edge
-        # if(self.position_x>=4) or self.position_x<=-5:
-        #     self.reward -= 500
+        # making sure robot doesnt fall off the edge I hope...
+        if self.position_y<= -4.7 or self.position_y>=4.7:
+            self.reward -= 500
 
-        # if(self.position_y>=7) or self.position_y<=-2:
-        #     self.reward -= 500
-
+        if self.position_x<= -4.7 or self.position_x>=4.7:
+            self.reward -= 500
 
         # self.observation_hold = [self.position_x, self.position_y, self.orientation, self.actions_taken] + list(self.detect)
         self.observation_hold = [self.position_x, self.position_y, self.orientation, self.actions_taken, self.detect[3], self.detect[4]]
@@ -279,9 +277,6 @@ class amigoEnv(gym.Env):
         print(self.observations, self.reward)
 
         return (self.observations, self.reward, done, {}, {})
-
-    def add_obstacle(self):
-        print("we'll randomly add cubes later if time")
 
     def initProximity(self):
         # likely won't need anything other than res to see if something was detected and dist if something was
