@@ -73,7 +73,7 @@ class amigoEnv(gym.Env):
 
         self.reward = 0
         self.done = False
-        self.observations = np.zeros((22,1))
+        self.observations = np.zeros((8,1))
 
         client = RemoteAPIClient('localhost', 23000)
         self.sim = client.getObject('sim')
@@ -247,13 +247,13 @@ class amigoEnv(gym.Env):
         self.observation_hold = [self.position_x, self.position_y, self.orientation, self.old_location_x, self.old_location_y, self.actions_taken] + list(self.detect)
         # self.observations = np.zeros((22,1))
 
-        for i in range(0,22):
+        for i in range(0,8):
             self.observations[i] = self.observation_hold[i]
 
         pos_of_sensor = self.sim.getObjectPosition(self.usensors[3])
         print(pos_of_sensor)
 
-        print(self.observations)
+        print(self.observations, self.reward)
 
         return (self.observations, self.reward, done, {}, {})
 
