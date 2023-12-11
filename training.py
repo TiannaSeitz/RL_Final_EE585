@@ -6,9 +6,9 @@
 #           using coppeliaSim
 
 # Author:   Tianna Seitz
-# Released: 12/07/2023
+# Released: 12/11/2023
 #
-# Notes: Version is incomplete
+# Notes: Version is Trainable
 #
 #################################
 
@@ -36,16 +36,16 @@ log_path = "/home/mabl/tianna_ws/RL_Final_EE585/tensorboard/test6"
 print("init model")
 model =  PPO('MlpPolicy', env, verbose = 1, tensorboard_log = log_path)
 
-model.learn(total_timesteps=1, reset_num_timesteps=False)
+model.learn(total_timesteps=1)
 episodes = 1
 for ep in range(0, episodes):
 	obs = env.reset()
 	done = False
 	while done == False:
-		print(f"episodes = {episodes}")
+		print(f"episodes = {ep}")
 		action, _states = model.predict(obs)
 		obs, rewards, done, info, _ = env.step(action)
-		model.learn(total_timesteps=1, reset_num_timesteps=False)
+		# model.learn(total_timesteps=1, reset_num_timesteps=False)
 		if done == True:
 			break
 	model.save(save_path)

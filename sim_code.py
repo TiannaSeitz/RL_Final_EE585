@@ -8,9 +8,9 @@
 #           obstacles
 
 # Author:   Tianna Seitz
-# Released: 12/07/2023
+# Released: 12/11/2023
 #
-# Notes: Version is ready to test/debug in lab
+# Notes: Version is ready for use
 #
 #################################
 
