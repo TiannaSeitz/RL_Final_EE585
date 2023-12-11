@@ -65,13 +65,13 @@ class amigoEnv(gym.Env):
         self.noDetectionDist = 0.75
         self.minDetectionDist = 0.3
         # we will have to go into campus to see where they actually are.
-        self.destination_x = 1.8
+        self.destination_x = 1.6
         self.destination_y =  -0.35
         self.destination_x_max = 2.6
         self.destination_y_max = 0.6
         
         self.action_space = Discrete(4) 
-        self.actions_max = 20
+        self.actions_max = 15
 
         self.reward = 0
         self.done = False
@@ -98,12 +98,18 @@ class amigoEnv(gym.Env):
         self.position_y = pos_of_sensor[1]
         self.orientation =  90
         self.actions_taken =  0
+
         # okay so we don't declare what the starting actions are here, we just set up the spaces for the stuff to be put into.
         
         self.observation_space = Box(low = -255, high = 255, shape = (6,1), dtype = np.float32) # may need to specify type!
 
     def reset(self): # may need to be revised...
         print(f"final reward = {self.reward}")
+        with open('test.txt', 'a') as file:
+            stringInput = str(self.reward)
+            file.write("\n")
+            file.write(stringInput)
+        file.close()
         self.sim.stopSimulation()
         sleep(1)
         # client = RemoteAPIClient('localhost', 23000)
@@ -161,7 +167,6 @@ class amigoEnv(gym.Env):
         # moving backwards or left will always be reverse motion
 
         # left right time
-        print(action)
         if action == 0: # move forward
             if self.orientation != 90:
                 # put code to turn robot
@@ -215,11 +220,24 @@ class amigoEnv(gym.Env):
             self.reward += 50
             print("reached location x")
             pos_done_x = True
+        else:
+            if abs(abs(self.destination_x_max)-abs(self.position_x)) < abs(abs(self.destination_x_max)-abs(self.old_location_x)):
+                self.reward += 20
+            else:
+                self.reward -= 30 # Maybe this is a reward that we can get rid of.
+
             
         if self.position_y > self.destination_y and self.position_y < self.destination_y_max: # end goal is to end up at this x,y location # end goal is to end up at this x,y location
             self.reward += 50
             print("reached location y")
             pos_done_y = True
+        else:
+            # did we advance towards the y coordinate of location?
+            if abs(abs(self.destination_y_max)-abs(self.position_y)) < abs(abs(self.destination_y_max)-abs(self.old_location_y)):
+                self.reward +=20
+            else:
+                self.reward -=10 # Maybe this is a reward that we can get rid of.
+
 
         if pos_done_y == True and pos_done_x == True:
             self.reward + 500
@@ -237,7 +255,7 @@ class amigoEnv(gym.Env):
             self.reward -= 500
             done = True
         else:
-            self.reward += 10
+            self.reward += 5
 
         if ultrasonic_result[4] < self.minDetectionDist-offset:
             # avoiding objects is the most important task consequence of reward must be high
@@ -245,19 +263,6 @@ class amigoEnv(gym.Env):
             done = True
         else:
             self.reward += 10
-
-        # did we advance towards the x coordinate of location?
-        # it's okay for robot to move away from final dest to avoid object, so consequence will be lower
-        if abs(self.destination_x_max)-abs(self.position_x) < abs(self.destination_x_max)-abs(self.old_location_x):
-            self.reward += 10
-        else:
-            self.reward -= 10 # Maybe this is a reward that we can get rid of.
-
-        # did we advance towards the y coordinate of location?
-        if abs(self.destination_y_max)-abs(self.position_y) < abs(self.destination_y_max)-abs(self.old_location_y):
-            self.reward +=10
-        else:
-            self.reward -=10 # Maybe this is a reward that we can get rid of.
 
         # making sure robot doesnt fall off the edge I hope...
         if self.position_y<= -4.7 or self.position_y>=4.7:

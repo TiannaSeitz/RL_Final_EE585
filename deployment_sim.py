@@ -30,7 +30,7 @@ import time
 from sim_code import amigoEnv #verify
 
 env = amigoEnv()
-save_path = "~/tjs1980/RL_Final_EE585/saved_models"
+save_path = "~/tjs1980/RL_Final_EE585/saved_models/test5/mymodel.zip"
 model = PPO.load(save_path, env = env)
 
 episodes = 5
