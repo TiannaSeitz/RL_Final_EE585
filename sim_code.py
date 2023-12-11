@@ -64,14 +64,14 @@ class amigoEnv(gym.Env):
         print("initalizing")
         self.noDetectionDist = 0.75
         self.minDetectionDist = 0.3
-        # we will have to go into campus to see where they actually are.
+        # this range is estimate recieved from real simulation coordinates
         self.destination_x = 1.6
         self.destination_y =  -0.35
         self.destination_x_max = 2.6
         self.destination_y_max = 0.6
         
-        self.action_space = Discrete(4) 
-        self.actions_max = 15
+        self.action_space = Discrete(4) # 4 possible actions 0-3
+        self.actions_max = 15 # terminate after 15 actions
 
         self.reward = 0
         self.done = False
@@ -109,16 +109,15 @@ class amigoEnv(gym.Env):
             stringInput = str(self.reward)
             file.write("\n")
             file.write(stringInput)
+
         file.close()
         self.sim.stopSimulation()
         sleep(1)
-        # client = RemoteAPIClient('localhost', 23000)
-        # self.sim = client.getObject('sim')
-        # client.setStepping(True)
-        # sleep(1)
         self.sim.closeScene()
         sleep(1)
-        # # do we need stepping?? maybe?
+
+        # do we need an explicit stepping call or is that already taken care of in init?
+
         self.sim.loadScene('/home/mabl/tianna_ws/RL_Final_EE585/tjs1980_final_env.ttt')
         self.sim.startSimulation()  
 
@@ -134,8 +133,8 @@ class amigoEnv(gym.Env):
         self.reward = 0
         
         self.observation_hold = [self.position_x, self.position_y, self.orientation, self.actions_taken, self.detect[3], self.detect[4]]
-        # self.observations = np.zeros((22,1))
 
+        # put observations into array compatible with space
         for i in range(0,6):
             self.observations[i] = self.observation_hold[i]
         return self.observations, {}
@@ -169,7 +168,7 @@ class amigoEnv(gym.Env):
         # left right time
         if action == 0: # move forward
             if self.orientation != 90:
-                # put code to turn robot
+                # turn robot
                 self.move(-1, 1, 2.9)
                 orientation = 90
             # move forward
@@ -180,7 +179,7 @@ class amigoEnv(gym.Env):
 
         elif action == 1: # move backwards
             if self.orientation != 90:
-                # put code to turn robot
+                # turn robot
                 self.move(-1, 1, 2.9)
                 orientation = 90
             # move backwards
@@ -191,7 +190,7 @@ class amigoEnv(gym.Env):
 
         elif action == 2: # move left
             if self.orientation != 0:
-                # put code to turn robot
+                # turn robot
                 self.move(1, -1, 2.9)
                 orientation = 0
             # move backwards (left)
@@ -202,7 +201,7 @@ class amigoEnv(gym.Env):
 
         elif action == 3: # move right
             if self.orientation != 0:
-                # put code to turn robot
+                # turn robot
                 self.move(1, -1, 2.9)
                 orientation = 0
             # move foward (right)
@@ -211,7 +210,7 @@ class amigoEnv(gym.Env):
             self.position_y = self.pos_of_sensor[1]
             self.position_x = self.pos_of_sensor[0]
 
-        # self.client.step() # I have no clue why this is here.
+        # self.client.step() # I have no clue why this is here. Is it necessary?
         ultrasonic_result = self.getProximity()
         pos_done_x = False
         pos_done_y = False
@@ -224,7 +223,7 @@ class amigoEnv(gym.Env):
             if abs(abs(self.destination_x_max)-abs(self.position_x)) < abs(abs(self.destination_x_max)-abs(self.old_location_x)):
                 self.reward += 20
             else:
-                self.reward -= 30 # Maybe this is a reward that we can get rid of.
+                self.reward -= 30 # striggles to reach x so a greater punishment is given for moving away from x
 
             
         if self.position_y > self.destination_y and self.position_y < self.destination_y_max: # end goal is to end up at this x,y location # end goal is to end up at this x,y location
@@ -236,9 +235,9 @@ class amigoEnv(gym.Env):
             if abs(abs(self.destination_y_max)-abs(self.position_y)) < abs(abs(self.destination_y_max)-abs(self.old_location_y)):
                 self.reward +=20
             else:
-                self.reward -=10 # Maybe this is a reward that we can get rid of.
+                self.reward -=10 
 
-
+        # check to see if we are at our final destination or just one component of our destinations
         if pos_done_y == True and pos_done_x == True:
             self.reward + 500
             done = True
@@ -258,13 +257,13 @@ class amigoEnv(gym.Env):
             self.reward += 5
 
         if ultrasonic_result[4] < self.minDetectionDist-offset:
-            # avoiding objects is the most important task consequence of reward must be high
+            # avoiding objects is the most important task consequence of reward must be consequential
             self.reward -= 500
             done = True
         else:
             self.reward += 10
 
-        # making sure robot doesnt fall off the edge I hope...
+        # making sure robot doesnt fall off the edge... (or get stuck on something for too long)
         if self.position_y<= -4.7 or self.position_y>=4.7:
             self.reward -= 500
 
@@ -291,7 +290,6 @@ class amigoEnv(gym.Env):
 
         for i in range (0,16):
             self.usensors[i]=self.sim.getObject("./ultrasonicSensor",[i])
-            # self.sim.setObjectInt32Param(usensors[i],_,_) # fix this error.
 
     def getProximity(self):
         for i in range (0,len(self.usensors)):
@@ -301,7 +299,7 @@ class amigoEnv(gym.Env):
             if (res>0) and (dist<self.noDetectionDist):
                 if (dist<self.minDetectionDist):
                     dist=self.minDetectionDist
-                    # I am not sure that we need these calculations. May just add dist?
+                    # The following calculations came from coppeliaSim
                 self.detect[i]=1-((dist-self.minDetectionDist)/(self.noDetectionDist-self.minDetectionDist))
             else:
                 self.detect[i]=6 # this is how we ensure it doesnt mistake no detection for 0!!
@@ -313,13 +311,10 @@ class amigoEnv(gym.Env):
 # turns left if left wheel is negative speed
 
     def move(self, vLeft, vRight, move_time):
-        # we'll need to specify vLeft and vRight
-        # will also need to specify time we do this
+        # we'll need to pass in vLeft and vRight
+        # will also need to pass in duration me we do this
         leftMotor = self.sim.getObject("./leftMotor")
         rightMotor = self.sim.getObject("./rightMotor")
-        # no we use wait in this house
-        # self.sim.backUntilTime = self.simg.getSimulationTime() + time
-
        
         self.sim.setJointTargetVelocity(leftMotor,vLeft)
         self.sim.setJointTargetVelocity(rightMotor,vRight)
@@ -336,4 +331,4 @@ class amigoEnv(gym.Env):
         self.sim.closeSene()
 
     def render(self):
-            print("placeholder I guess")
+            print("placeholder for later I guess")

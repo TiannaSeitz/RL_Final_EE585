@@ -29,15 +29,17 @@ from sim_code import amigoEnv #verify
 
 
 env = amigoEnv()
-# Wrap the environment with DummyVecEnv for compatibility
-# env = DummyVecEnv([lambda: env])
+# DummyVecEnv wraps environment automatically
 save_path = "/home/mabl/tianna_ws/RL_Final_EE585/saved_models/test6/mymodel.zip"
 log_path = "/home/mabl/tianna_ws/RL_Final_EE585/tensorboard/test6"
 print("init model")
 model =  PPO('MlpPolicy', env, verbose = 1, tensorboard_log = log_path)
 
+# model should update policy after every action
 model.learn(total_timesteps=1)
-episodes = 1
+
+# model.learn loops indefinitely so it never reaches this point 
+episodes = 200
 for ep in range(0, episodes):
 	obs = env.reset()
 	done = False
@@ -52,16 +54,4 @@ for ep in range(0, episodes):
 
 evaluate_policy(model, env, n_eval_episodes = 2, render = False)
 env.close()
-# for sets in range(0, 200):
-#     obs = env.reset()
-#     for episode in range(0, 21):
-#         obs, reward, done, info, _ = env.step(env.action_space.sample())
-#         model.learn(total_timesteps=1, reset_num_timesteps=False)
-#         if done == True:
-#             obs = env.reset()
-#         model.save(save_path)
-#     env.close()
-
-# alright, so it gets a reward, but the position doesn't update in model.learn
-# like it does in env.step. We need to find out why.
 
