@@ -14,30 +14,6 @@
 #
 #################################
 
-
-'''
-3 files:
-
-train file
-- this is where we will call our class here for training
--
--
-
-test file (x2)?
-- will need one for sim
-- will need one for deployment
--
-
-environment in coppeliaSim file
-- api is: zmqRemoteApi import RemoteAPIClient
-- import gym
-- when we want to move the joints in coppeliaSim we will use our setVelocity whatever in our actions with ssim.getObect for each controllable
-- we can use sim.checkProximity or whatever to get the proximity.
-- we'll add our client info in def load(self) in our environment set
-- we can add our cubes n shit in here if we want
-- we'll need a variable to distinguish if we use ros or coppeliasim movements
-'''
-
 import gym
 from gym import Env
 from gym.spaces import Discrete, Box
@@ -112,13 +88,10 @@ class amigoEnv(gym.Env):
         file.close()
         self.sim.stopSimulation()
         sleep(1)
-        # client = RemoteAPIClient('localhost', 23000)
-        # self.sim = client.getObject('sim')
-        # client.setStepping(True)
-        # sleep(1)
+       
         self.sim.closeScene()
         sleep(1)
-        # # do we need stepping?? maybe?
+    
         self.sim.loadScene('/home/mabl/tianna_ws/RL_Final_EE585/tjs1980_final_env.ttt')
         self.sim.startSimulation()  
 
@@ -134,8 +107,7 @@ class amigoEnv(gym.Env):
         self.reward = 0
         
         self.observation_hold = [self.position_x, self.position_y, self.orientation, self.actions_taken, self.detect[3], self.detect[4]]
-        # self.observations = np.zeros((22,1))
-
+ 
         for i in range(0,6):
             self.observations[i] = self.observation_hold[i]
         return self.observations, {}
@@ -168,8 +140,9 @@ class amigoEnv(gym.Env):
 
         # left right time
         if action == 0: # move forward
+            # if robot is not facing forward...
             if self.orientation != 90:
-                # put code to turn robot
+                # turn robot
                 self.move(-1, 1, 2.9)
                 orientation = 90
             # move forward
@@ -313,13 +286,10 @@ class amigoEnv(gym.Env):
 # turns left if left wheel is negative speed
 
     def move(self, vLeft, vRight, move_time):
-        # we'll need to specify vLeft and vRight
-        # will also need to specify time we do this
+        # specify vLeft and vRight speeds
+        # also specify time we do this
         leftMotor = self.sim.getObject("./leftMotor")
         rightMotor = self.sim.getObject("./rightMotor")
-        # no we use wait in this house
-        # self.sim.backUntilTime = self.simg.getSimulationTime() + time
-
        
         self.sim.setJointTargetVelocity(leftMotor,vLeft)
         self.sim.setJointTargetVelocity(rightMotor,vRight)
